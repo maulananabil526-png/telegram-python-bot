@@ -1,6 +1,7 @@
 import os
 import random
 import asyncio
+import html
 from datetime import datetime
 
 from handlers.admin import maintenance_guard, track_user
@@ -87,15 +88,15 @@ async def get_jumlah(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         notif = (
-            "🔔 **PERMINTAAN DITOLAK (>2000)**\n"
-            f"👤 User: @{uname.replace('_', '\\_')} (`{uid}`)\n"
-            f"📊 Jumlah: `{jumlah}`"
+            "🔔 <b>PERMINTAAN DITOLAK (>2000)</b>\n"
+            f"👤 User: @{html.escape(uname)} (<code>{uid}</code>)\n"
+            f"📊 Jumlah: <code>{jumlah}</code>"
         )
         try:
             await context.bot.send_message(
-                chat_id=config.OWNER_ID,
+                chat_id=OWNER_ID,
                 text=notif,
-                parse_mode="Markdown",
+                parse_mode="HTML",
             )
         except:
             pass
@@ -105,13 +106,13 @@ async def get_jumlah(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if jumlah > 1500:
         notif = (
-            "🔔 **GENERATE BESAR (1500-2000)**\n"
-            f"👤 User: @{uname.replace('_', '\\_')} (`{uid}`)\n"
-            f"📊 Jumlah: `{jumlah}`"
+            "🔔 <b>GENERATE BESAR (1500-2000)</b>\n"
+            f"👤 User: @{html.escape(uname)} (<code>{uid}</code>)\n"
+            f"📊 Jumlah: <code>{jumlah}</code>"
         )
         try:
             await context.bot.send_message(
-                chat_id=config.OWNER_ID,
+                chat_id=OWNER_ID,
                 text=notif,
                 parse_mode="Markdown",
             )
@@ -196,7 +197,7 @@ async def get_jumlah(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: `{e}`", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}")
 
     finally:
         await status.delete()

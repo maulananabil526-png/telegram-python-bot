@@ -504,7 +504,226 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
            parse_mode="Markdown"
         )
 
+# =========================
+# ADMIN MANAGEMENT
+# =========================
+def load_admins():
+    if not os.path.exists(ADMINS_FILE):
+        return [OWNER_ID]
+    with open(ADMINS_FILE) as f:
+        return json.load(f)
+
+def save_admins(admins):
+    os.makedirs(os.path.dirname(ADMINS_FILE), exist_ok=True)
+    with open(ADMINS_FILE, "w") as f:
+        json.dump(admins, f)
+
+async def admin_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        await update.message.reply_text("❌ Hanya owner")
+        return
+    
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❌ Format: /admin add <user_id>")
+        return
+    
+    user_id = int(context.args[0])
+    admins = load_admins()
+    
+    if user_id in admins:
+        await update.message.reply_text(f"ℹ️ {user_id} sudah admin")
+        return
+    
+    admins.append(user_id)
+    save_admins(admins)
+    await update.message.reply_text(f"✅ {user_id} ditambah jadi admin")
+
+async def admin_del(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        await update.message.reply_text("❌ Hanya owner")
+        return
+    
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❌ Format: /admin del <user_id>")
+        return
+    
+    user_id = int(context.args[0])
+    if user_id == OWNER_ID:
+        await update.message.reply_text("❌ Tidak bisa hapus owner")
+        return
+    
+    admins = load_admins()
+    if user_id not in admins:
+        await update.message.reply_text(f"ℹ️ {user_id} bukan admin")
+        return
+    
+    admins.remove(user_id)
+    save_admins(admins)
+    await update.message.reply_text(f"✅ {user_id} dihapus dari admin")
+
+async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    admins = load_admins()
+    text = "👤 *DAFTAR ADMIN*\n"
+    for idx, admin in enumerate(admins, 1):
+        text += f"{idx}. `{admin}`\n"
+    
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+# =========================
+# BAN MANAGEMENT
+# =========================
+async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❌ Format: /ban <user_id> [reason]")
+        return
+    
+    user_id = int(context.args[0])
+    reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Tidak ada alasan"
+    
+    banned = context.application.bot_data.setdefault("banned", [])
+    if user_id in banned:
+        await update.message.reply_text(f"ℹ️ {user_id} sudah di-ban")
+        return
+    
+    banned.append(user_id)
+    await update.message.reply_text(f"✅ {user_id} di-ban\n📝 Alasan: {reason}")
+
+async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❌ Format: /unban <user_id>")
+        return
+    
+    user_id = int(context.args[0])
+    banned = context.application.bot_data.get("banned", [])
+    
+    if user_id not in banned:
+        await update.message.reply_text(f"ℹ️ {user_id} tidak di-ban")
+        return
+    
+    banned.remove(user_id)
+    await update.message.reply_text(f"✅ {user_id} di-unban")
+
+# =========================
+# FEATURE TOGGLE
+# =========================
+async def toggle_feature(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text("❌ Format: /feature <name> on|off")
+        return
+    
+    feature = context.args[0]
+    status = context.args[1].lower()
+    
+    if status not in ["on", "off"]:
+        await update.message.reply_text("❌ Status harus 'on' atau 'off'")
+        return
+    
+    features = context.application.bot_data.setdefault("features", {})
+    features[feature] = (status == "on")
+    
+    await update.message.reply_text(f"✅ Feature '{feature}' di-set ke {status.upper()}")
+
+# =========================
+# LIMIT MANAGEMENT
+# =========================
+async def set_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text("❌ Format: /limit <feature> <number>")
+        return
+    
+    feature = context.args[0]
+    try:
+        limit = int(context.args[1])
+    except ValueError:
+        await update.message.reply_text("❌ Limit harus angka")
+        return
+    
+    limits = context.application.bot_data.setdefault("limits", {})
+    limits[feature] = limit
+    
+    await update.message.reply_text(f"✅ Limit '{feature}' di-set ke {limit}")
+
+async def reset_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    context.application.bot_data["limits"] = {}
+    await update.message.reply_text("✅ Semua limit direset")
+
+# =========================
+# MAINTENANCE
+# =========================
+async def maintenance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    if not context.args:
+        await update.message.reply_text("❌ Format: /maintenance on|off")
+        return
+    
+    status = context.args[0].lower()
+    if status == "on":
+        toggle_maintenance()
+        await update.message.reply_text("🛠 Maintenance mode: ON")
+    elif status == "off":
+        toggle_maintenance()
+        await update.message.reply_text("🛠 Maintenance mode: OFF")
+    else:
+        await update.message.reply_text("❌ Status harus 'on' atau 'off'")
+
+# =========================
+# ADMIN DISPATCHER
+# =========================
+async def admin_cmd_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        await update.message.reply_text("❌ Hanya owner")
+        return
+    
+    if not context.args:
+        await admin_cmd(update, context)
+        return
+    
+    cmd = context.args[0].lower()
+    
+    if cmd == "add":
+        context.args = context.args[1:]
+        await admin_add(update, context)
+    elif cmd == "del":
+        context.args = context.args[1:]
+        await admin_del(update, context)
+    elif cmd == "list":
+        await admin_list(update, context)
+    else:
+        await admin_cmd(update, context)
+
 def setup(app):
-    app.add_handler(CommandHandler("admin", admin_cmd))
+    app.add_handler(CommandHandler("admin", admin_cmd_dispatcher))
     app.add_handler(CallbackQueryHandler(admin_callback, pattern="^admin_"))
+    
+    # Ban management
+    app.add_handler(CommandHandler("ban", ban_user))
+    app.add_handler(CommandHandler("unban", unban_user))
+    
+    # Feature & Limit
+    app.add_handler(CommandHandler("feature", toggle_feature))
+    app.add_handler(CommandHandler("limit", set_limit))
+    app.add_handler(CommandHandler("reset", reset_limit))
+    
+    # Maintenance
+    app.add_handler(CommandHandler("maintenance", maintenance_cmd))
 

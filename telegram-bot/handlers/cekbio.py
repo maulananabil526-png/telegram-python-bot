@@ -426,13 +426,12 @@ async def cekbio_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         else:
-            await update.message.reply_text(text, parse_mode="Markdown")
+            await update.message.reply_text(text)
 
     except Exception as e:
         await update.message.reply_text(
-           f"❌ `Terjadi error`:\n`{e}`",
-           reply_markup=kb_owner(),
-           parse_mode="Markdown"
+           f"❌ Terjadi error:\n{str(e)[:200]}",
+           reply_markup=kb_owner()
         )
 
     finally:

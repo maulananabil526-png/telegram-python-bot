@@ -3,3 +3,5 @@ aiohttp
 flask
 httpx
 requests
+python-dotenv
+telethon
