@@ -13,6 +13,12 @@ const axios = require('axios')
 const app = express()
 app.use(express.json())
 
+const HEARTBEAT_URL = process.env.BOT_HEARTBEAT_URL || 'http://127.0.0.1:10000/backend-heartbeat'
+
+function sendHeartbeat() {
+  axios.post(HEARTBEAT_URL, { source: 'wa-server' }).catch(() => {})
+}
+
 /**
  * sessions[userId] = {
  *   sock,
@@ -42,6 +48,39 @@ function waitForSocketOpen(sock, timeout = 15000) {
 
     sock.ev.on('connection.update', onUpdate)
   })
+}
+
+function normalizeNumber(number) {
+  return String(number || '').replace(/\D/g, '')
+}
+
+async function getContactInfo(sock, number) {
+  const cleanNumber = normalizeNumber(number)
+  if (!cleanNumber) {
+    return { number: String(number), registered: false, bio: '', type: 'Personal' }
+  }
+
+  try {
+    const [result] = await sock.onWhatsApp(cleanNumber)
+    const exists = Boolean(result?.exists)
+    let bio = ''
+
+    if (exists && result?.jid) {
+      try {
+        const status = await sock.fetchStatus(result.jid)
+        bio = status?.status || ''
+      } catch {}
+    }
+
+    return {
+      number: String(number),
+      registered: exists,
+      bio,
+      type: result?.isBusiness ? 'Business' : 'Personal'
+    }
+  } catch {
+    return { number: String(number), registered: false, bio: '', type: 'Personal' }
+  }
 }
 
 // ================= START SOCKET =================
@@ -138,6 +177,31 @@ async function restoreSessions() {
   }
 }
 
+// ================= CEKBIO =================
+app.post('/cekbio', async (req, res) => {
+  const { userId, numbers = [], mode } = req.body || {}
+
+  if (!userId || !Array.isArray(numbers) || numbers.length === 0) {
+    return res.status(400).json({ ok: false, error: 'param missing' })
+  }
+
+  const session = sessions[userId]
+  if (!session?.sock) {
+    return res.status(404).json({ ok: false, error: 'session not found' })
+  }
+
+  try {
+    await waitForSocketOpen(session.sock, 10000)
+  } catch {}
+
+  const results = []
+  for (const number of numbers) {
+    results.push(await getContactInfo(session.sock, number))
+  }
+
+  res.json({ ok: true, results, mode })
+})
+
 // ================= STATUS =================
 app.get('/status', (req, res) => {
   const userId = req.query.userId
@@ -148,20 +212,22 @@ app.get('/status', (req, res) => {
     return res.json({
       ok: true,
       status: 'online',
+      online: true,
+      paired: true,
       number: session.sock.user.id.split(':')[0],
       startTime: session.startTime
     })
   }
 
   if (session && session.pairing) {
-    return res.json({ ok: true, status: 'pairing' })
+    return res.json({ ok: true, status: 'pairing', online: false, paired: false })
   }
 
   if (fs.existsSync(`${sessionDir}/creds.json`)) {
-    return res.json({ ok: true, status: 'offline' })
+    return res.json({ ok: true, status: 'offline', online: false, paired: true })
   }
 
-  res.json({ ok: false })
+  res.json({ ok: false, status: 'disconnected', online: false, paired: false })
 })
 
 // ================= PAIR (FIX UTAMA) =================
@@ -235,6 +301,8 @@ app.get('/logout', async (req, res) => {
 // ================= START SERVER =================
 app.listen(3000, '127.0.0.1', async () => {
   console.log('🚀 Server Backend Ready')
+  sendHeartbeat()
+  setInterval(sendHeartbeat, 15000)
   await restoreSessions()
 })
 

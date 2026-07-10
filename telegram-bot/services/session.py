@@ -3,8 +3,10 @@ import os
 import time
 from threading import Lock
 
-# ⛔ PATH TETAP SESUAI PERMINTAAN
-SESSION_FILE = "/data/data/com.termux/files/home/shared/sessions.json"
+BASE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+SESSION_FILE = os.path.join(BASE_DIR, "sessions.json")
+
+os.makedirs(BASE_DIR, exist_ok=True)
 
 FILE_LOCK = Lock()
 
@@ -21,6 +23,7 @@ def load_sessions():
 
 def save_sessions(data):
     with FILE_LOCK:
+        os.makedirs(os.path.dirname(SESSION_FILE), exist_ok=True)
         with open(SESSION_FILE, "w") as f:
             json.dump(data, f, indent=2)
 

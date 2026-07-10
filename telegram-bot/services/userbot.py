@@ -1,6 +1,7 @@
 import os
 import time
 import asyncio
+import sqlite3
 from telethon import TelegramClient, functions, types
 from telethon.errors import FloodWaitError
 import config
@@ -25,18 +26,50 @@ _userbot_lock = asyncio.Lock()
 # START USERBOT (DIPANGGIL SEKALI)
 # ===============================
 async def start_userbot(application):
-    async with _userbot_lock:
-        if not client.is_connected():
-            await client.start()
+    global client
 
-            me = await client.get_me()
-            application.bot_data["userbot"] = {
-                "status": "CONNECTED",
-                "since": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "dc": client.session.dc_id,
-                "me": f"@{me.username}" if me.username else me.first_name
-            }
-            print("🤖 Userbot connected")
+    async with _userbot_lock:
+        try:
+            if not client.is_connected():
+                await client.start()
+
+                me = await client.get_me()
+                application.bot_data["userbot"] = {
+                    "status": "CONNECTED",
+                    "since": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "dc": client.session.dc_id,
+                    "me": f"@{me.username}" if me.username else me.first_name
+                }
+                print("🤖 Userbot connected")
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower():
+                print(f"[Userbot] Session locked, mencoba reset session: {e}")
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+                session_path = client.session.filename
+                if os.path.exists(session_path):
+                    os.remove(session_path)
+                if os.path.exists(session_path + "-journal"):
+                    os.remove(session_path + "-journal")
+                client = TelegramClient(
+                    os.path.join(SESS_DIR, "admin_userbot"),
+                    config.API_ID,
+                    config.API_HASH,
+                    sequential_updates=True
+                )
+                await client.start()
+                me = await client.get_me()
+                application.bot_data["userbot"] = {
+                    "status": "CONNECTED",
+                    "since": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "dc": client.session.dc_id,
+                    "me": f"@{me.username}" if me.username else me.first_name
+                }
+                print("🤖 Userbot connected after reset")
+            else:
+                raise
 # ===============================
 # GET REAL DC (FIX TOTAL)
 # ===============================

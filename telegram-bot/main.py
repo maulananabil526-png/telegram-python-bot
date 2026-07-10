@@ -8,7 +8,7 @@ import asyncio
 from datetime import date
 
 from flask import Flask, request
-from telegram.ext import ApplicationBuilder
+from telegram.ext import ApplicationBuilder, JobQueue
 from telegram.request import HTTPXRequest
 from telegram import BotCommand
 
@@ -251,10 +251,12 @@ def main():
         write_timeout=60
     )
 
+    job_queue = JobQueue()
     application = (
         ApplicationBuilder()
         .token(config.BOT_TOKEN)
         .request(request)
+        .job_queue(job_queue)
         .post_init(post_init)
         .build()
     )

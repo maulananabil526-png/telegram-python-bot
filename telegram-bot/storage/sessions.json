@@ -1,0 +1,14 @@
+{
+  "demo": {
+    "paired": true
+  },
+  "5705956133": {
+    "cek_mode": "Fast",
+    "paired": false
+  },
+  "8484854737": {
+    "paired": false,
+    "paired_at": 1783646492,
+    "cek_mode": "Slow"
+  }
+}
